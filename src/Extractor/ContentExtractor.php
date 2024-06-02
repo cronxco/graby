@@ -158,6 +158,7 @@ class ContentExtractor
         $this->logger->info('Attempting to parse HTML with {parser}', ['parser' => $parser]);
 
         $this->readability = $this->getReadability($html, $url, $parser, $this->siteConfig->tidy() && $smartTidy);
+        $success = $this->readability->init();
         $tidied = $this->readability->tidied;
 
         $this->logger->info('Body size after Readability: {length}', ['length' => \strlen((string) $this->readability->dom->saveXML($this->readability->dom->documentElement))]);
@@ -313,14 +314,6 @@ class ContentExtractor
             }
         }
 
-        // strip elements using Readability.com and Instapaper.com ignore class names
-        // .entry-unrelated and .instapaper_ignore
-        // See https://www.readability.com/publishers/guidelines/#view-plainGuidelines
-        // and http://blog.instapaper.com/post/730281947
-        $elems = $this->xpath->query("//*[contains(concat(' ',normalize-space(@class),' '),' entry-unrelated ') or contains(concat(' ',normalize-space(@class),' '),' instapaper_ignore ')]", $this->readability->dom);
-
-        $this->removeElements($elems, 'Stripping {length} .entry-unrelated,.instapaper_ignore elements');
-
         // strip elements that contain style 'display: none' or 'visibility:hidden'
         // @todo: inline style are convert to <style> by tidy, so we can't remove hidden content ...
         $elems = $this->xpath->query("//*[contains(@style,'display:none') or contains(@style,'visibility:hidden')]", $this->readability->dom);
@@ -470,17 +463,6 @@ class ContentExtractor
             $this->readability->dom,
             'Date found (datetime marked time element): {date}'
         );
-
-        // still missing title or body, so we detect using Readability
-        $success = false;
-        if ($detectTitle || $detectBody) {
-            $this->logger->info('Using Readability');
-            // clone body if we're only using Readability for title (otherwise it may interfere with body element)
-            if (isset($this->body)) {
-                $this->body = $this->body->cloneNode(true);
-            }
-            $success = $this->readability->init();
-        }
 
         if ($detectTitle && $this->readability->getTitle()->textContent) {
             $this->title = trim($this->readability->getTitle()->textContent);
